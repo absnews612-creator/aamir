@@ -1,0 +1,32 @@
+{
+  "Default Urdu Preset": {
+    "width": 1080,
+    "height": 1080,
+    "fileName": "urdu-news-card",
+    "background": {
+      "type": "gradient",
+      "color": "#000000",
+      "gradient": {
+        "color1": "#0f172a",
+        "color2": "#1e293b",
+        "direction": "to bottom right"
+      }
+    },
+    "headlines": [
+      {
+        "id": 1001,
+        "text": "اہم خبر اور تازہ ترین اپ ڈیٹ",
+        "fontSize": 80,
+        "lineHeight": 1.2,
+        "fontFamily": "JameelNooriNastaliq",
+        "textColor": "#ffffff",
+        "textPos": { "x": 90, "y": 800 },
+        "direction": "rtl",
+        "textAlign": "right",
+        "shadow": { "enabled": true, "offsetX": 2, "offsetY": 2, "blur": 8, "color": "rgba(0,0,0,0.8)" },
+        "width": 900
+      }
+    ],
+    "images": []
+  }
+}

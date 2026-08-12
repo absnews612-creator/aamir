@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Social Card Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/jameel-noori@1.1.2/jameel-noori.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2&family=Gulzar&family=Montserrat&family=Noto+Sans+Arabic:wght@100..900;wdth@62.5..100&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div id="root"></div>
+    <script type="text/babel">
+      function SocialCardGenerator() {
+        const { useState, useRef, useEffect, useMemo } = React;
+        const containerRef = useRef(null);
+
+        const [isAuthenticated, setIsAuthenticated] = useState(() => {
+          try {
+            const savedAuth = localStorage.getItem('socialCardAuth');
+            return savedAuth ? JSON.parse(savedAuth) : false;
+          } catch (e) {
+            console.error("Failed to load authentication status from localStorage", e);
+            return false;
+          }
+        });
+
+        const [isBackgroundCollapsed, setIsBackgroundCollapsed] = useState(false);
+        const [isPresetsCollapsed, setIsPresetsCollapsed] = useState(false);
+        const [isImagesCollapsed, setIsImagesCollapsed] = useState(false);
+        const [isVignetteCollapsed, setIsVignetteCollapsed] = useState(false);
+        const [isLogoCollapsed, setIsLogoCollapsed] = useState(false);
+        const [isCanvasCollapsed, setIsCanvasCollapsed] = useState(false);
+        const [isFileNameCollapsed, setIsFileNameCollapsed] = useState(false);
+
+        const [vignette, setVignette] = useState({ show: false, x: 0, y: 0, scale: 1 });
+        const [DEFAULT_PRESETS, setDEFAULT_PRESETS] = useState({});
+        const [presets, setPresets] = useState({});
+        const [currentPresetName, setCurrentPresetName] = useState("");
+
+        useEffect(() => {
+          fetch('presets.json')
+            .then(response => {
+              if (!response.ok) throw new Error("File not found");
+              return response.json();
+            })
+            .then(data => {
+              setDEFAULT_PRESETS(data);
+              const saved = localStorage.getItem("userPresets");
+              const userPresets = saved ? JSON.parse(saved) : {};
+              setPresets({ ...data, ...userPresets });
+            })
+            .catch(err => {
+              console.error("Failed to load presets.json, checking localStorage only", err);
+              const saved = localStorage.getItem("userPresets");
+              if (saved) setPresets(JSON.parse(saved));
+            });
+        }, []);
+
+        function loadPreset(name) {
+          const preset = presets[name];
+          if (!preset) {
+            alert("Preset not found");
+            return;
+          }
+
+          setHeadlines(preset.headlines || []);
+          setImages(preset.images ? preset.images.map(img => ({
+            ...img,
+            width: img.width || 400,
+            height: img.height || 300,
+            innerX: img.innerX || 0,
+            innerY: img.innerY || 0,
+            innerScale: img.innerScale || 1,
+            locked: img.locked ?? false,
+            scale: img.scale !== undefined ? img.scale : 1,
+            fitMode: img.fitMode || { top: false, right: false, bottom: false, left: false },
+            stretchEnabled: img.stretchEnabled || false,
+          })) : []);
+
+          if (preset.width) setWidth(preset.width);
+          if (preset.height) setHeight(preset.height);
+          if (preset.logo) setLogo(preset.logo);
+          if (preset.fileName) setFileName(preset.fileName);
+          if (preset.vignette !== undefined) setVignette(preset.vignette);
+          if (preset.globalBorderColor) setGlobalBorderColor(preset.globalBorderColor);
+          if (preset.globalBorderSize !== undefined) setGlobalBorderSize(preset.globalBorderSize);
+          if (preset.background) setBackground(preset.background);
+
+          if (preset.draggableHeadlines !== undefined) {
+            setDraggableHeadlines(preset.draggableHeadlines);
+          } else {
+            setDraggableHeadlines(true);
+          }
+
+          setCurrentPresetName(name);
+          alert(`${name} preset loaded!`);
+        }
+
+        function savePreset(name) {
+          if (!name) {
+            alert("Please enter a preset name");
+            return;
+          }
+
+          const newPreset = {
+            headlines,
+            images: images.map(img => ({
+              id: img.id,
+              src: img.src,
+              x: img.x,
+              y: img.y,
+              width: img.width,
+              height: img.height,
+              innerX: img.innerX,
+              innerY: img.innerY,
+              innerScale: img.innerScale,
+              locked: img.locked,
+              scale: img.scale,
+              zIndex: img.zIndex,
+              borderEnabled: img.borderEnabled,
+              stretchEnabled: img.stretchEnabled,
+              fitMode: img.fitMode,
+              mask: img.mask,
+            })),
+            width, height, logo, fileName, vignette,
+            globalBorderColor, globalBorderSize, background,
+            draggableHeadlines
+          };
+
+          const updatedPresets = { ...presets, [name]: newPreset };
+          setPresets(updatedPresets);
+          localStorage.setItem("userPresets", JSON.stringify(updatedPresets));
+
+          alert(`Preset "${name}" saved!`);
+        }
+
+        function deletePreset(name) {
+          if (!name) {
+            alert("Please select a preset to delete");
+            return;
+          }
+          if (DEFAULT_PRESETS[name]) {
+            alert("Default presets cannot be deleted");
+            return;
+          }
+
+          const updatedPresets = { ...presets };
+          delete updatedPresets[name];
+          setPresets(updatedPresets);
+          localStorage.setItem("userPresets", JSON.stringify(updatedPresets));
+
+          alert(`Preset "${name}" deleted!`);
+        }
+
+        function resetPresets() {
+          if (!window.confirm("This will delete all your saved presets and restore only the defaults. Continue?")) {
+            return;
+          }
+          setPresets(DEFAULT_PRESETS);
+          localStorage.removeItem("userPresets");
+          alert("Presets reset to default!");
+        }
+
+        function exportPresets() {
+          const json = JSON.stringify(presets, null, 2);
+          navigator.clipboard.writeText(json)
+            .then(() => alert("All presets copied to clipboard!"))
+            .catch(err => console.error("Clipboard copy failed", err));
+        }
+
+        function importPresets() {
+          const json = prompt("Paste presets JSON here:");
+          if (!json) return;
+          try {
+            const parsed = JSON.parse(json);
+            if (typeof parsed !== "object") throw new Error("Invalid format");
+
+            const updatedPresets = { ...DEFAULT_PRESETS, ...parsed };
+            setPresets(updatedPresets);
+            localStorage.setItem("userPresets", JSON.stringify(parsed));
+
+            alert("Presets imported successfully!");
+          } catch (e) {
+            alert("Invalid presets JSON");
+            console.error("Import failed:", e);
+          }
+        }
+
+        const [globalBorderColor, setGlobalBorderColor] = useState("#ffffff");
+        const [globalBorderSize, setGlobalBorderSize] = useState(4);
+        const [images, setImages] = useState([]);
+        const [activeImageId, setActiveImageId] = useState(null);
+        const [width, setWidth] = useState(1080);
+        const [height, setHeight] = useState(1080);
+        const [logo, setLogo] = useState({ show: true, position: "top-right" });
+        const [fileName, setFileName] = useState("social-card");
+        const [background, setBackground] = useState({
+          type: 'solid',
+          color: '#000000',
+          gradient: {
+            color1: '#ffffff',
+            color2: '#000000',
+            direction: 'to bottom right'
+          },
+          imageSrc: 'bg.png'
+        });
+
+        const [headlines, setHeadlines] = useState([{
+          id: Date.now(),
+          text: "خبر یا سرخی یہاں درج کریں",
+          fontSize: 90,
+          lineHeight: 1.2,
+          fontFamily: "JameelNooriNastaliq",
+          textColor: "#ffffff",
+          textPos: { x: 100, y: 200 },
+          direction: "rtl",
+          textAlign: "right",
+          shadow: { enabled: true, offsetX: 2, offsetY: 2, blur: 6, color: "rgba(0,0,0,0.6)" },
+          stroke: { enabled: false, width: 1, color: "#000000" },
+          sideline: { show: true, width: 30, gap: 60, height: null, autoHeight: true, color: "#ff0000", opacity: 1 },
+          sidelineOffset: 0,
+          isCollapsed: false,
+          width: 900,
+          border: {
+            enabled: false,
+            color: "#ffffff",
+            width: 2,
+            radius: 0,
+            style: "solid",
+            top: true,
+            right: true,
+            bottom: true,
+            left: true
+          },
+        }]);
+        const [expandedHeadlineId, setExpandedHeadlineId] = useState(null);
+        const headlineRefs = useRef({});
+        const [draggableHeadlines, setDraggableHeadlines] = useState(true);
+
+        function addHeadline() {
+          const newHeadline = {
+            id: Date.now(),
+            text: "نئی سرخی",
+            fontSize: 60,
+            lineHeight: 1.2,
+            fontFamily: "JameelNooriNastaliq",
+            textColor: "#ffffff",
+            textPos: { x: 100, y: 300 },
+            direction: "rtl",
+            textAlign: "right",
+            shadow: { enabled: true, offsetX: 2, offsetY: 2, blur: 6, color: "rgba(0,0,0,0.6)" },
+            stroke: { enabled: false, width: 1, color: "#000000" },
+            sideline: { show: true, width: 30, gap: 60, height: null, autoHeight: true, color: "#ff0000", opacity: 1 },
+            sidelineOffset: 0,
+            isCollapsed: false,
+            width: 900,
+            border: {
+              enabled: false,
+              color: "#ffffff",
+              width: 2,
+              radius: 0,
+              style: "solid",
+              top: true,
+              right: true,
+              bottom: true,
+              left: true
+            },
+          };
+          setHeadlines([...headlines, newHeadline]);
+        }
+
+        function updateHeadline(id, updatedProps) {
+          setHeadlines(current => current.map(h => h.id === id ? { ...h, ...updatedProps } : h));
+        }
+
+        function deleteHeadline(id) {
+          setHeadlines(current => current.filter(h => h.id !== id));
+          if (expandedHeadlineId === id) {
+            setExpandedHeadlineId(null);
+          }
+        }
+
+        useEffect(() => {
+          try {
+            localStorage.setItem('socialCardAuth', JSON.stringify(isAuthenticated));
+          } catch (e) {
+            console.error("Failed to save authentication status to localStorage", e);
+          }
+        }, [isAuthenticated]);
+
+        useEffect(() => {
+          try {
+            const savedData = localStorage.getItem('socialCardData');
+            if (savedData) {
+              const parsedData = JSON.parse(savedData);
+              if (parsedData.headlines) setHeadlines(parsedData.headlines);
+              if (parsedData.images) setImages(parsedData.images.map(img => ({
+                ...img,
+                fitMode: img.fitMode || { top: false, right: false, bottom: false, left: false },
+                stretchEnabled: img.stretchEnabled || false,
+              })));
+              if (parsedData.width) setWidth(parsedData.width);
+              if (parsedData.height) setHeight(parsedData.height);
+              if (parsedData.logo) setLogo(parsedData.logo);
+              if (parsedData.fileName) setFileName(parsedData.fileName);
+              if (parsedData.background) setBackground(parsedData.background);
+            }
+          } catch (e) {
+            console.error("Failed to load data from localStorage", e);
+          }
+        }, []);
+
+        useEffect(() => {
+          const dataToSave = { headlines, images, width, height, logo, fileName, background };
+          try {
+            localStorage.setItem('socialCardData', JSON.stringify(dataToSave));
+          } catch (e) {
+            console.error("Failed to save data to localStorage", e);
+          }
+        }, [headlines, images, width, height, logo, fileName, background]);
+
+        useEffect(() => {
+          const handleBeforeUnload = (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+          };
+          window.addEventListener('beforeunload', handleBeforeUnload);
+          return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+          };
+        }, []);
+
+        useEffect(() => {
+          headlines.forEach(h => {
+            const el = headlineRefs.current[h.id];
+            if (!el) return;
+            const measured = el.offsetHeight;
+            const wantsAuto = h.sideline?.autoHeight !== false;
+            if (wantsAuto) {
+              if (typeof measured === "number" && h.sideline?.height !== measured) {
+                updateHeadline(h.id, {
+                  sideline: { ...h.sideline, height: measured, autoHeight: true }
+                });
+              }
+            }
+          });
+        }, [headlines]);
+
+        function onImageUpload(e) {
+          const files = e.target.files;
+          if (!files) return;
+
+          const newImages = Array.from(files).map((file, index) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            return new Promise((resolve) => {
+              img.onload = () => {
+                const newImg = {
+                  id: Date.now() + index,
+                  src: img.src,
+                  x: 50,
+                  y: 50,
+                  width: 400,
+                  height: 300,
+                  innerX: 0,
+                  innerY: 0,
+                  scale: 1,
+                  innerScale: 1,
+                  locked: false,
+                  zIndex: images.length + index,
+                  borderEnabled: false,
+                  fitMode: { top: false, right: false, bottom: false, left: false },
+                  originalWidth: img.naturalWidth,
+                  originalHeight: img.naturalHeight,
+                  mask: {
+                    enabled: false,
+                    shape: 'circle',
+                    feather: 20,
+                    x: 50,
+                    y: 50,
+                    scale: 40
+                  }
+                };
+                resolve(newImg);
+              };
+            });
+          });
+
+          Promise.all(newImages).then(resolvedImages => {
+            setImages([...images, ...resolvedImages]);
+          });
+        }
+
+        function getMaskStyle(img) {
+          if (!img.mask || !img.mask.enabled) return {};
+          const { shape, feather, x, y, scale } = img.mask;
+          const baseDim = Math.min(img.originalWidth || 400, img.originalHeight || 300);
+          const maskSizePx = (baseDim * scale) / 100;
+          const featherPx = (baseDim * feather) / 200;
+
+          let maskImage = '';
+
+          if (shape === 'circle' || shape === 'oval') {
+            const shapeType = shape === 'circle' ? 'circle' : 'ellipse';
+            maskImage = `radial-gradient(${shapeType} ${maskSizePx}px at ${x}% ${y}%, black ${maskSizePx - featherPx}px, transparent ${maskSizePx + featherPx}px)`;
+          } else if (shape === 'square') {
+            const left = x - scale/2;
+            const right = x + scale/2;
+            const top = y - scale/2;
+            const bottom = y + scale/2;
+            const f = feather / 2;
+
+            maskImage = `linear-gradient(to right, transparent ${left - f}%, black ${left + f}%, black ${right - f}%, transparent ${right + f}%), linear-gradient(to bottom, transparent ${top - f}%, black ${top + f}%, black ${bottom - f}%, transparent ${bottom + f}%)`;
+            return {
+              WebkitMaskImage: maskImage,
+              WebkitMaskComposite: 'source-in',
+              maskComposite: 'intersect'
+            };
+          }
+
+          return {
+            WebkitMaskImage: maskImage,
+            maskImage: maskImage,
+            WebkitMaskRepeat: 'no-repeat',
+            maskRepeat: 'no-repeat'
+          };
+        }
+
+        function onBackgroundUpload(e) {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              setBackground({
+                ...background,
+                type: 'image',
+                imageSrc: event.target.result
+              });
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+
+        function getCoords(e) {
+          return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+        }
+
+        function startDragImage(e, id) {
+          const targetImg = images.find(im => im.id === id);
+          if (!targetImg) return;
+
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
+          setActiveImageId(id);
+
+          const { x: startX, y: startY } = getCoords(e);
+          const initX = targetImg.x;
+          const initY = targetImg.y;
+          const initInnerX = targetImg.innerX || 0;
+          const initInnerY = targetImg.innerY || 0;
+
+          function onMove(ev) {
+            const { x: currentX, y: currentY } = getCoords(ev);
+            const dx = currentX - startX;
+            const dy = currentY - startY;
+
+            setImages(prev => prev.map(im => {
+              if (im.id !== id) return im;
+              if (im.locked) {
+                return { ...im, innerX: initInnerX + dx, innerY: initInnerY + dy };
+              } else {
+                return { ...im, x: initX + dx, y: initY + dy };
+              }
+            }));
+          }
+
+          function onUp() {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("touchmove", onMove);
+            window.removeEventListener("touchend", onUp);
+          }
+
+          window.addEventListener("mousemove", onMove, { passive: false });
+          window.addEventListener("mouseup", onUp);
+          window.addEventListener("touchmove", onMove, { passive: false });
+          window.addEventListener("touchend", onUp);
+        }
+
+        function startDragText(e, id) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const { x: startX, y: startY } = getCoords(e);
+          const headline = headlines.find(h => h.id === id);
+          const initPos = { ...headline.textPos };
+
+          function onMove(ev) {
+            const { x: currentX, y: currentY } = getCoords(ev);
+            const dx = currentX - startX;
+            const dy = currentY - startY;
+
+            updateHeadline(id, {
+              textPos: {
+                x: initPos.x + dx,
+                y: initPos.y + dy,
+              },
+            });
+          }
+
+          function onUp() {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("touchmove", onMove);
+            window.removeEventListener("touchend", onUp);
+          }
+
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+          window.addEventListener("touchmove", onMove);
+          window.addEventListener("touchend", onUp);
+        }
+
+        function duplicateHeadline(id) {
+          const original = headlines.find(h => h.id === id);
+          if (!original) return;
+
+          const duplicated = {
+            ...original,
+            id: Date.now(),
+            textPos: {
+              x: original.textPos.x,
+              y: original.textPos.y + (original.fontSize * 1.5)
+            }
+          };
+
+          setHeadlines([...headlines, duplicated]);
+          setExpandedHeadlineId(duplicated.id);
+        }
+
+        function startDragVignette(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const { x: startX, y: startY } = getCoords(e);
+          const initX = vignette.x, initY = vignette.y;
+          function onMove(ev) {
+            const { x: currentX, y: currentY } = getCoords(ev);
+            setVignette(v => ({ ...v, x: initX + currentX - startX, y: initY + currentY - startY }));
+          }
+          function onUp() {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("touchmove", onMove);
+            window.removeEventListener("touchend", onUp);
+          }
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+          window.addEventListener("touchmove", onMove);
+          window.addEventListener("touchend", onUp);
+        }
+
+        function exportAsImage() {
+          if (!containerRef.current) return;
+          setActiveImageId(null);
+
+          setTimeout(() => {
+            const textOffset = -40;
+            html2canvas(containerRef.current, {
+              useCORS: true,
+              scale: 1,
+              scrollY: -window.scrollY,
+              onclone: (clonedDoc) => {
+                const textElements = clonedDoc.querySelectorAll('[data-headline="true"]');
+                textElements.forEach(el => {
+                  const currentTop = parseFloat(el.style.top || "0");
+                  el.style.top = (currentTop + textOffset) + "px";
+                });
+              }
+            })
+            .then((canvas) => {
+              const link = document.createElement("a");
+              link.download = (fileName && fileName.trim() ? fileName.trim() : "social-card") + ".png";
+              link.href = canvas.toDataURL("image/png");
+              link.click();
+            })
+            .catch((err) => {
+              console.log("export failed:", err);
+            });
+          }, 0);
+        }
+
+        function updateImage(id, updatedProps) {
+          setImages(current => current.map(im => im.id === id ? { ...im, ...updatedProps } : im));
+        }
+
+        function replaceImage(id) {
+          const input = document.createElement("input");
+          input.type = "file";
+          input.accept = "image/*";
+          input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+              const imgElement = new Image();
+              imgElement.src = URL.createObjectURL(file);
+              imgElement.onload = () => {
+                setImages((current) =>
+                  current.map((img) =>
+                    img.id === id
+                      ? {
+                          ...img,
+                          src: imgElement.src,
+                          originalWidth: imgElement.naturalWidth,
+                          originalHeight: imgElement.naturalHeight,
+                          innerX: 0,
+                          innerY: 0,
+                          innerScale: 1
+                        }
+                      : img
+                  )
+                );
+              };
+            }
+          };
+          input.click();
+        }
+
+        function changeImageScale(id, scale) {
+          const newScale = parseFloat(scale);
+          if (!isNaN(newScale)) {
+            setImages((imgs) => imgs.map(im => im.id === id ? { ...im, scale: newScale } : im));
+          }
+        }
+
+        function bringForward(id) {
+          const maxZ = Math.max(...images.map(im => im.zIndex), 0);
+          setImages((imgs) => imgs.map(im => im.id === id ? { ...im, zIndex: maxZ + 1 } : im));
+        }
+
+        function sendBackward(id) {
+          const minZ = Math.min(...images.map(im => im.zIndex), 0);
+          setImages((imgs) => imgs.map(im => im.id === id ? { ...im, zIndex: minZ - 1 } : im));
+        }
+
+        function deleteImage(id) { setImages((imgs) => imgs.filter(im => im.id !== id)); }
+
+        const backgroundStyle = useMemo(() => {
+          switch (background.type) {
+            case 'solid':
+              return { backgroundColor: background.color };
+            case 'gradient':
+              return {
+                backgroundImage: `linear-gradient(${background.gradient.direction}, ${background.gradient.color1}, ${background.gradient.color2})`
+              };
+            case 'image':
+              return {
+                backgroundImage: `url('${background.imageSrc}')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              };
+            default:
+              return {};
+          }
+        }, [background]);
+
+        function getImageStyle(img) {
+          return {
+            left: img.x,
+            top: img.y,
+            transform: `scale(${img.scale})`,
+            transformOrigin: 'top left',
+            width: img.width || 400,
+            height: img.height || 300,
+          };
+        }
+
+        const handlePasswordSubmit = (e) => {
+          e.preventDefault();
+          const password = e.target.elements.password.value;
+          if (password === "sabah123") {
+            setIsAuthenticated(true);
+          } else {
+            alert("Incorrect password.");
+          }
+        };
+
+        if (!isAuthenticated) {
+          return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-200">
+              <form onSubmit={handlePasswordSubmit} className="p-8 bg-white rounded-lg shadow-md">
+                <h2 className="text-xl font-bold mb-4">Enter Password to Access</h2>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Enter password"
+                  className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
+                />
+                <button
+                  type="submit"
+                  className="mt-4 w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring"
+                >
+                  Submit
+                </button>
+              </form>
+            </div>
+          );
+        }
+
+        return (
+          <div className="p-4 max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="w-full md:w-96 space-y-4">
+                <h2 className="text-xl font-semibold">Controls</h2>
+
+                <div className="bg-white p-3 rounded shadow">
+                  <div
+                    className="flex justify-between items-center cursor-pointer"
+                    onClick={() => setIsPresetsCollapsed(!isPresetsCollapsed)}
+                  >
+                    <h3 className="text-lg font-medium">Presets</h3>
+                    <span>{isPresetsCollapsed ? '▼' : '▲'}</span>
+                  </div>
+                  {!isPresetsCollapsed && (
+                    <div className="mt-2 space-y-2">
+                      <select
+                        onChange={(e) => loadPreset(e.target.value)}
+                        value={currentPresetName || ""}
+                        className="w-full border p-1 rounded"
+                      >
+                        <option value="" disabled>Select Preset</option>
+                        {Object.keys(presets).map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Preset name"
+                          value={currentPresetName || ""}
+                          onChange={(e) => setCurrentPresetName(e.target.value)}
+                          className="w-full border p-1 rounded"
+                        />
+                        <button
+                          onClick={() => savePreset(currentPresetName)}
+                          className="bg-green-500 text-white px-3 py-1 rounded"
+                        >
+                          Save
+                        </button>
+                      </div>
+                      <div className="flex gap-2 text-sm">
+                        <button
+                          onClick={() => deletePreset(currentPresetName)}
+                          className="bg-red-500 text-white px-2 py-1 rounded w-1/2"
+                        >
+                          Delete Preset
+                        </button>
+                        <button
+                          onClick={resetPresets}
+                          className="bg-yellow-600 text-white px-2 py-1 rounded w-1/2"
+                        >
+                          Reset Default
+                        </button>
+                      </div>
+                      <div className="flex gap-2 text-sm">
+                        <button
+                          onClick={exportPresets}
+                          className="bg-gray-700 text-white px-2 py-1 rounded w-1/2"
+                        >
+                          Export Presets
+                        </button>
+                        <button
+                          onClick={importPresets}
+                          className="bg-gray-700 text-white px-2 py-1 rounded w-1/2"
+                        >
+                          Import Presets
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white p-3 rounded shadow">
+                  <div
+                    className="flex justify-between items-center cursor-pointer"
+                    onClick={() => setIsBackgroundCollapsed(!isBackgroundCollapsed)}
+                  >
+                    <h3 className="text-lg font-medium">Background</h3>
+                    <span>{isBackgroundCollapsed ? '▼' : '▲'}</span>
+                  </div>
+                  {!isBackgroundCollapsed && (
+                    <div className="mt-2 space-y-2">
+                      <select
+                        value={background.type}
+                        onChange={e => setBackground({ ...background, type: e.target.value })}
+                        className="w-full border p-1 rounded"
+                      >
+                        <option value="solid">Solid Color</option>
+                        <option value="image">Image from File</option>
+                        <option value="gradient">Gradient</option>
+                      </select>
+
+                      {background.type === 'solid' && (
+                        <div className="flex items-center gap-2">
+                          <label>Color:</label>
+                          <input
+                            type="color"
+                            value={background.color}
+                            onChange={e => setBackground({ ...background, color: e.target.value })}
+                          />
+                        </div>
+                      )}
+
+                      {background.type === 'gradient' && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label>Start Color:</label>
+                            <input
+                              type="color"
+                              value={background.gradient.color1}
+                              onChange={e => setBackground({
+                                ...background,
+                                gradient: { ...background.gradient, color1: e.target.value }
+                              })}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <label>End Color:</label>
+                            <input
+                              type="color"
+                              value={background.gradient.color2}
+                              onChange={e => setBackground({
+                                ...background,
+                                gradient: { ...background.gradient, color2: e.target.value }
+                              })}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {background.type === 'image' && (
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={onBackgroundUpload}
+                          className="w-full border p-1 rounded"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white p-3 rounded shadow">
+                  <div
+                    className="flex justify-between items-center cursor-pointer"
+                    onClick={() => setIsImagesCollapsed(!isImagesCollapsed)}
+                  >
+                    <h3 className="text-lg font-medium">Images</h3>
+                    <span>{isImagesCollapsed ? '▼' : '▲'}</span>
+                  </div>
+                  {!isImagesCollapsed && (
+                    <div className="mt-2 space-y-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={onImageUpload}
+                        className="w-full border p-1 rounded"
+                      />
+                      {images.map((img, idx) => (
+                        <div key={img.id} className="border p-2 rounded text-sm space-y-2">
+                          <div className="flex justify-between items-center font-bold">
+                            <span>Image {idx + 1}</span>
+                            <button
+                              onClick={() => deleteImage(img.id)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => replaceImage(img.id)}
+                              className="bg-blue-500 text-white px-2 py-1 rounded text-xs"
+                            >
+                              Replace
+                            </button>
+                            <button
+                              onClick={() => bringForward(img.id)}
+                              className="bg-gray-200 px-2 py-1 rounded text-xs"
+                            >
+                              Bring Forward
+                            </button>
+                            <button
+                              onClick={() => sendBackward(img.id)}
+                              className="bg-gray-200 px-2 py-1 rounded text-xs"
+                            >
+                              Send Back
+                            </button>
+                          </div>
+                          <div>
+                            <label className="text-xs">Scale: {img.scale}</label>
+                            <input
+                              type="range"
+                              min="0.1"
+                              max="3"
+                              step="0.05"
+                              value={img.scale}
+                              onChange={(e) => changeImageScale(img.id, e.target.value)}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white p-3 rounded shadow">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Headlines</h3>
+                    <button
+                      onClick={addHeadline}
+                      className="bg-blue-500 text-white px-2 py-1 text-sm rounded"
+                    >
+                      + Add Headline
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        id="dragHeadlinesToggle"
+                        checked={draggableHeadlines}
+                        onChange={(e) => setDraggableHeadlines(e.target.checked)}
+                      />
+                      <label htmlFor="dragHeadlinesToggle" className="text-sm">
+                        Enable Headline Dragging
+                      </label>
+                    </div>
+                    {headlines.map((h, i) => (
+                      <div key={h.id} className="border p-2 rounded space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold text-sm">Headline #{i + 1}</span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => duplicateHeadline(h.id)}
+                              className="text-blue-500 text-xs"
+                            >
+                              Duplicate
+                            </button>
+                            <button
+                              onClick={() => deleteHeadline(h.id)}
+                              className="text-red-500 text-xs"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                        <textarea
+                          value={h.text}
+                          onChange={(e) => updateHeadline(h.id, { text: e.target.value })}
+                          className="w-full border p-1 rounded text-sm"
+                          rows="2"
+                        />
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label>Font Size:</label>
+                            <input
+                              type="number"
+                              value={h.fontSize}
+                              onChange={(e) => updateHeadline(h.id, { fontSize: parseInt(e.target.value) || 12 })}
+                              className="w-full border p-1 rounded"
+                            />
+                          </div>
+                          <div>
+                            <label>Color:</label>
+                            <input
+                              type="color"
+                              value={h.textColor}
+                              onChange={(e) => updateHeadline(h.id, { textColor: e.target.value })}
+                              className="w-full h-8 border rounded"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white p-3 rounded shadow">
+                  <div
+                    className="flex justify-between items-center cursor-pointer"
+                    onClick={() => setIsCanvasCollapsed(!isCanvasCollapsed)}
+                  >
+                    <h3 className="text-lg font-medium">Canvas Size</h3>
+                    <span>{isCanvasCollapsed ? '▼' : '▲'}</span>
+                  </div>
+                  {!isCanvasCollapsed && (
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <label>Width (px):</label>
+                        <input
+                          type="number"
+                          value={width}
+                          onChange={e => setWidth(Number(e.target.value))}
+                          className="w-full border p-1 rounded"
+                        />
+                      </div>
+                      <div>
+                        <label>Height (px):</label>
+                        <input
+                          type="number"
+                          value={height}
+                          onChange={e => setHeight(Number(e.target.value))}
+                          className="w-full border p-1 rounded"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white p-3 rounded shadow space-y-2">
+                  <label className="text-sm font-medium">Export File Name:</label>
+                  <input
+                    type="text"
+                    value={fileName}
+                    onChange={e => setFileName(e.target.value)}
+                    className="w-full border p-1 rounded text-sm"
+                  />
+                  <button
+                    onClick={exportAsImage}
+                    className="w-full bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700"
+                  >
+                    Export Image (PNG)
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto flex justify-center items-start">
+                <div
+                  ref={containerRef}
+                  id="canvas-container"
+                  className="relative overflow-hidden shadow-2xl transition-all"
+                  style={{
+                    width: `${width}px`,
+                    height: `${height}px`,
+                    ...backgroundStyle
+                  }}
+                >
+                  {images.map(img => (
+                    <div
+                      key={img.id}
+                      onMouseDown={e => startDragImage(e, img.id)}
+                      onTouchStart={e => startDragImage(e, img.id)}
+                      style={{
+                        position: 'absolute',
+                        cursor: 'grab',
+                        zIndex: img.zIndex,
+                        ...getImageStyle(img)
+                      }}
+                    >
+                      <img
+                        src={img.src}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          ...getMaskStyle(img)
+                        }}
+                      />
+                    </div>
+                  ))}
+
+                  {headlines.map(h => (
+                    <div
+                      key={h.id}
+                      data-headline="true"
+                      ref={el => headlineRefs.current[h.id] = el}
+                      onMouseDown={e => draggableHeadlines && startDragText(e, h.id)}
+                      onTouchStart={e => draggableHeadlines && startDragText(e, h.id)}
+                      style={{
+                        position: 'absolute',
+                        left: `${h.textPos.x}px`,
+                        top: `${h.textPos.y}px`,
+                        width: `${h.width}px`,
+                        color: h.textColor,
+                        fontSize: `${h.fontSize}px`,
+                        lineHeight: h.lineHeight,
+                        fontFamily: h.fontFamily,
+                        direction: h.direction,
+                        textAlign: h.textAlign,
+                        textShadow: h.shadow?.enabled
+                          ? `${h.shadow.offsetX}px ${h.shadow.offsetY}px ${h.shadow.blur}px ${h.shadow.color}`
+                          : 'none',
+                        cursor: draggableHeadlines ? 'move' : 'default',
+                        userSelect: 'none',
+                        zIndex: 1000
+                      }}
+                    >
+                      {h.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<SocialCardGenerator />);
+    </script>
+  </body>
+</html>
