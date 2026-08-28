@@ -38,38 +38,87 @@
           } catch (e) { return false; }
         });
 
-        const [width, setWidth] = useState(800);
-        const [height, setHeight] = useState(800);
-        const [fileName, setFileName] = useState("social-card");
+        const [width, setWidth] = useState(1080);
+        const [height, setHeight] = useState(1080);
+        const [fileName, setFileName] = useState("news-card");
         const [draggableHeadlines, setDraggableHeadlines] = useState(true);
 
-        const [background, setBackground] = useState({
+        // 1. ڈیفالٹ بیک گراؤنڈ سیٹنگز
+        const DEFAULT_BACKGROUND = {
           type: 'gradient',
           color: '#0f172a',
-          gradient: { color1: '#0f172a', color2: '#1e293b', direction: 'to bottom right' },
+          gradient: { color1: '#0b1329', color2: '#1e293b', direction: 'to bottom right' },
           imageSrc: ''
-        });
+        };
+
+        const [background, setBackground] = useState(DEFAULT_BACKGROUND);
 
         const [images, setImages] = useState([]);
-        const [headlines, setHeadlines] = useState([{
-          id: Date.now(),
-          text: "اہم خبر اور تازہ ترین اپ ڈیٹ یہاں درج کریں",
-          fontSize: 45,
-          lineHeight: 1.4,
-          fontFamily: "'Noto Sans Arabic', sans-serif",
-          textColor: "#ffffff",
-          bgColor: "transparent",
-          rotation: 0,
-          textPos: { x: 50, y: 500 },
-          direction: "rtl",
-          textAlign: "right",
-          shadow: { enabled: true, offsetX: 2, offsetY: 2, blur: 8, color: "rgba(0,0,0,0.8)" },
-          width: 700,
-        }]);
+        
+        // 2. ڈیفالٹ لے آؤٹ اور ٹیکسچر سرخی
+        const [headlines, setHeadlines] = useState([
+          {
+            id: 1,
+            text: "اہم بریکنگ نیوز اور تازہ ترین اپ ڈیٹ یہاں درج کریں",
+            fontSize: 55,
+            lineHeight: 1.4,
+            fontFamily: "'Jameel Noori Nastaleeq', 'JameelNooriNastaliq', serif",
+            textColor: "#ffffff",
+            bgColor: "transparent",
+            rotation: 0,
+            textPos: { x: 90, y: 720 },
+            direction: "rtl",
+            textAlign: "right",
+            shadow: { enabled: true, offsetX: 2, offsetY: 2, blur: 8, color: "rgba(0,0,0,0.9)" },
+            width: 900,
+          }
+        ]);
 
         const [presets, setPresets] = useState({});
         const [currentPresetName, setCurrentPresetName] = useState("");
         const [activeTab, setActiveTab] = useState('text');
+
+        // لوکل اسٹوریج سے پرسیٹس اور ڈیفالٹ ٹیمپلیٹ لوڈ کرنا
+        useEffect(() => {
+          try {
+            const localPresets = JSON.parse(localStorage.getItem("userPresets")) || {};
+            setPresets(localPresets);
+
+            const savedDefault = localStorage.getItem("defaultStudioLayout");
+            if (savedDefault) {
+              const parsed = JSON.parse(savedDefault);
+              if (parsed.background) setBackground(parsed.background);
+              if (parsed.headlines) setHeadlines(parsed.headlines);
+            }
+          } catch(e) {}
+        }, []);
+
+        function resetToDefault() {
+          setBackground(DEFAULT_BACKGROUND);
+          setHeadlines([
+            {
+              id: Date.now(),
+              text: "اہم بریکنگ نیوز اور تازہ ترین اپ ڈیٹ یہاں درج کریں",
+              fontSize: 55,
+              lineHeight: 1.4,
+              fontFamily: "'Jameel Noori Nastaleeq', 'JameelNooriNastaliq', serif",
+              textColor: "#ffffff",
+              bgColor: "transparent",
+              rotation: 0,
+              textPos: { x: 90, y: 720 },
+              direction: "rtl",
+              textAlign: "right",
+              shadow: { enabled: true, offsetX: 2, offsetY: 2, blur: 8, color: "rgba(0,0,0,0.9)" },
+              width: 900,
+            }
+          ]);
+        }
+
+        function saveAsPermanentDefault() {
+          const currentLayout = { background, headlines, width, height };
+          localStorage.setItem("defaultStudioLayout", JSON.stringify(currentLayout));
+          alert("موجودہ لے آؤٹ کو آپ کا مستقل ڈیفالٹ بنا دیا گیا ہے!");
+        }
 
         function loadPreset(name) {
           const p = presets[name];
@@ -101,8 +150,8 @@
               setImages(prev => [...prev, {
                 id: Date.now() + index,
                 src: img.src,
-                x: 50, y: 50,
-                width: 300, height: 200,
+                x: 140, y: 120,
+                width: 800, height: 500,
                 scale: 1, rotation: 0,
                 zIndex: prev.length + 1
               }]);
@@ -122,17 +171,17 @@
           setHeadlines(prev => [...prev, {
             id: Date.now(),
             text: "نئی سرخی درج کریں",
-            fontSize: 35,
+            fontSize: 45,
             lineHeight: 1.3,
-            fontFamily: "'Noto Sans Arabic', sans-serif",
+            fontFamily: "'Jameel Noori Nastaleeq', 'JameelNooriNastaliq', serif",
             textColor: "#ffffff",
             bgColor: "transparent",
             rotation: 0,
-            textPos: { x: 50, y: 200 },
+            textPos: { x: 90, y: 300 },
             direction: "rtl",
             textAlign: "right",
-            shadow: { enabled: true, offsetX: 2, offsetY: 2, blur: 6, color: "rgba(0,0,0,0.6)" },
-            width: 600
+            shadow: { enabled: true, offsetX: 2, offsetY: 2, blur: 6, color: "rgba(0,0,0,0.8)" },
+            width: 900
           }]);
         }
 
@@ -194,7 +243,7 @@
 
         function exportImage() {
           if (!containerRef.current) return;
-          html2canvas(containerRef.current, { useCORS: true, scale: 1.5 }).then(canvas => {
+          html2canvas(containerRef.current, { useCORS: true, scale: 1 }).then(canvas => {
             const link = document.createElement('a');
             link.download = `${fileName || 'card'}.png`;
             link.href = canvas.toDataURL('image/png');
@@ -237,7 +286,10 @@
           <div className="flex flex-col h-screen overflow-hidden">
             <header className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex justify-between items-center">
               <h1 className="text-xl font-bold text-blue-400">Social Card Studio Pro</h1>
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
+                <button onClick={resetToDefault} className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-xs text-gray-200 transition">
+                  ریسیٹ ڈیفالٹ
+                </button>
                 <input
                   type="text"
                   value={fileName}
@@ -304,7 +356,7 @@
                                 onChange={e => updateHeadline(h.id, { fontFamily: e.target.value })}
                                 className="w-full bg-gray-800 border border-gray-700 rounded p-1 text-xs text-white"
                               >
-                                <option value="'Jameel Noori Nastaleeq', serif">جمیل نوری نستعلیق</option>
+                                <option value="'Jameel Noori Nastaleeq', 'JameelNooriNastaliq', serif">جمیل نوری نستعلیق</option>
                                 <option value="'Gulzar', serif">گلزار (Gulzar)</option>
                                 <option value="'Baloo Bhaijaan 2', cursive">بالو بھائی جان (Modern)</option>
                                 <option value="'Noto Sans Arabic', sans-serif">نوٹو سنس (Clean)</option>
@@ -459,6 +511,15 @@
 
                   {activeTab === 'presets' && (
                     <div className="space-y-4 text-xs">
+                      <button 
+                        onClick={saveAsPermanentDefault} 
+                        className="w-full bg-indigo-600 hover:bg-indigo-500 py-2 rounded font-bold text-white transition mb-2"
+                      >
+                        موجودہ سیٹنگ کو ڈیفالٹ بنائیں
+                      </button>
+
+                      <hr className="border-gray-700 my-2" />
+
                       <div>
                         <label className="text-gray-400 block mb-1">محفوظ شدہ پرسیٹ چنیں:</label>
                         <select
@@ -489,7 +550,7 @@
                 <div
                   ref={containerRef}
                   id="canvas-container"
-                  className="relative overflow-hidden shadow-2xl transition-all"
+                  className="relative overflow-hidden shadow-2xl transition-all border border-gray-800"
                   style={{
                     width: `${width}px`,
                     height: `${height}px`,
